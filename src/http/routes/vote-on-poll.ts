@@ -1,6 +1,6 @@
 import z from "zod"
 import { app } from "../app"
-import { prisma } from "../../lib/prisma"
+import { randomUUID } from "crypto"
 
 export async function voteOnPoll() {
   app.post('/polls/:pollId/votes', async (request, reply) => {
@@ -15,7 +15,21 @@ export async function voteOnPoll() {
     const { pollId } = voteOnPollParams.parse(request.params)
     const { pollOptionId } = voteOnPollBody.parse(request.body)
 
-    return reply.status(201).send()
-  })
+    let { sessionId } = request.cookies
 
+    if (!sessionId) {
+      sessionId = randomUUID()
+
+      reply.setCookie('sessionId', sessionId, {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        signed: true,
+        httpOnly: true,
+      })
+    }
+
+
+
+    return reply.status(201).send({ sessionId })
+  })
 }
