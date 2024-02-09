@@ -1,6 +1,7 @@
 import z from "zod"
 import { app } from "../app"
 import { randomUUID } from "crypto"
+import { prisma } from "../../lib/prisma"
 
 export async function voteOnPoll() {
   app.post('/polls/:pollId/votes', async (request, reply) => {
@@ -17,6 +18,28 @@ export async function voteOnPoll() {
 
     let { sessionId } = request.cookies
 
+    if (sessionId) {
+      const userPreviousVoteOnPoll = await prisma.vote.findUnique({
+        where: {
+          sessionId_pollId: {
+            sessionId,
+            pollId
+          }
+        }
+      })
+
+      if (userPreviousVoteOnPoll && userPreviousVoteOnPoll.pollOptionId !== pollOptionId) {
+        await prisma.vote.delete({
+          where: {
+            id: userPreviousVoteOnPoll.id
+          }
+        })
+
+      } else if (userPreviousVoteOnPoll) {
+        return reply.status(400).send({ message: 'You already voted on this poll' })
+      }
+    }
+
     if (!sessionId) {
       sessionId = randomUUID()
 
@@ -28,8 +51,14 @@ export async function voteOnPoll() {
       })
     }
 
+    await prisma.vote.create({
+      data: {
+        sessionId,
+        pollId,
+        pollOptionId,
+      }
+    })
 
-
-    return reply.status(201).send({ sessionId })
+    return reply.status(201).send()
   })
 }
